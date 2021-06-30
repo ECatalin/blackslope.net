@@ -8,6 +8,7 @@ using BlackSlope.Api.Common.Middleware.Correlation;
 using BlackSlope.Api.Common.Middleware.ExceptionHandling;
 using BlackSlope.Api.Common.Versioning.Interfaces;
 using BlackSlope.Api.Common.Versioning.Services;
+using BlackSlope.Api.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -36,15 +37,21 @@ namespace BlackSlope.Api
 
             services.AddSwagger(HostConfig.Swagger);
             services.AddAzureAd(HostConfig.AzureAd);
-            services.AddAutoMapper(GetAssemblyNamesToScanForMapperProfiles());
+            services.AddAutoMapper(GetAssembliesToScanForMapperProfiles());
             services.AddCorrelation();
             services.AddTransient<IFileSystem, FileSystem>();
-            services.AddTransient<IVersionService, AssemblyVersionService>();
+
+            // NOTE: Pick one of the below versioning services
+            services.AddTransient<IVersionService, AssemblyVersionService>(); // For Version parsing via Assembly ref
+            // services.AddTransient<IVersionService, JsonVersionService>();   // For Version parsing via JSON
+
+            services.AddMvcApi();
             services.AddHealthChecksService();
 
             services.AddMovieService();
             services.AddMovieRepository(_configuration);
-            services.AddMovieValidators();
+
+            services.AddValidators();
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -90,9 +97,9 @@ namespace BlackSlope.Api
             });
         }
 
-        // make a list of projects in the solution which must be scanned for mapper profiles
-        private static IEnumerable<string> GetAssemblyNamesToScanForMapperProfiles() =>
-            new string[] { Assembly.GetExecutingAssembly().GetName().Name };
+        // make a list of assemblies in the solution which must be scanned for mapper profiles
+        private static IEnumerable<Assembly> GetAssembliesToScanForMapperProfiles() =>
+            new Assembly[] { Assembly.GetExecutingAssembly() };
 
         private void ApplicationConfiguration(IServiceCollection services)
         {

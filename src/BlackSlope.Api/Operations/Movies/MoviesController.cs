@@ -3,9 +3,10 @@ using System.Diagnostics.Contracts;
 using System.Threading.Tasks;
 using AutoMapper;
 using BlackSlope.Api.Common.Controllers;
+using BlackSlope.Api.Common.Exceptions;
+using BlackSlope.Api.Common.Validators.Interfaces;
 using BlackSlope.Api.Operations.Movies.Requests;
 using BlackSlope.Api.Operations.Movies.Responses;
-using BlackSlope.Api.Operations.Movies.Validators.Interfaces;
 using BlackSlope.Api.Operations.Movies.ViewModels;
 using BlackSlope.Services.Movies;
 using BlackSlope.Services.Movies.DomainModels;
@@ -20,15 +21,13 @@ namespace BlackSlope.Api.Operations.Movies
     {
         private readonly IMapper _mapper;
         private readonly IMovieService _movieService;
-        private readonly ICreateMovieRequestValidator _createMovieRequestValidator;
-        private readonly IUpdateMovieRequestValidator _updateMovieRequestValidator;
+        private readonly IBlackSlopeValidator _blackSlopeValidator;
 
-        public MoviesController(IMovieService movieService, IMapper mapper, ICreateMovieRequestValidator createMovieRequestValidator, IUpdateMovieRequestValidator updateMovieRequestValidator)
+        public MoviesController(IMovieService movieService, IMapper mapper, IBlackSlopeValidator blackSlopeValidator)
         {
             _mapper = mapper;
+            _blackSlopeValidator = blackSlopeValidator;
             _movieService = movieService;
-            _createMovieRequestValidator = createMovieRequestValidator;
-            _updateMovieRequestValidator = updateMovieRequestValidator;
         }
 
         /// <summary>
@@ -104,7 +103,7 @@ namespace BlackSlope.Api.Operations.Movies
             var request = new CreateMovieRequest { Movie = viewModel };
 
             // validate request model
-            await _createMovieRequestValidator.ValidateAsync(request);
+            await _blackSlopeValidator.AssertValidAsync(request);
 
             // map view model to domain model
             var movie = _mapper.Map<MovieDomainModel>(viewModel);
@@ -140,7 +139,7 @@ namespace BlackSlope.Api.Operations.Movies
             Contract.Requires(viewModel != null);
             var request = new UpdateMovieRequest { Movie = viewModel, Id = id };
 
-            _updateMovieRequestValidator.Validate(request);
+            await _blackSlopeValidator.AssertValidAsync(request);
 
             // id can be in URL, body, or both
             viewModel.Id = id ?? viewModel.Id;
@@ -182,6 +181,20 @@ namespace BlackSlope.Api.Operations.Movies
 
             // 204 response
             return HandleDeletedResponse();
+        }
+
+
+        /// <summary>
+        /// This is a sample error.
+        /// </summary>
+        /// <remarks>
+        /// Use this operation to test the global error handling
+        /// </remarks>
+        [HttpGet]
+        [Route("SampleError")]
+        public object SampleError()
+        {
+            throw new HandledException(ExceptionType.Security, "This is an example security issue.", System.Net.HttpStatusCode.RequestEntityTooLarge);
         }
     }
 }

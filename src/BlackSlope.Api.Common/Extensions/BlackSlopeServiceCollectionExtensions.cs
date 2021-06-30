@@ -1,16 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
+using System.Text.Json.Serialization;
 using AutoMapper;
 using BlackSlope.Api.Common.Configuration;
 using BlackSlope.Api.Common.Swagger;
+using BlackSlope.Api.Common.Versioning;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.OpenApi.Models;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace Microsoft.Extensions.DependencyInjection
@@ -40,12 +41,16 @@ namespace Microsoft.Extensions.DependencyInjection
         /// <returns></returns>
         public static IMvcBuilder AddMvcService(this IServiceCollection services) =>
             services.AddMvc()
-                .AddNewtonsoftJson(options =>
-                {
-                    options.SerializerSettings.Converters.Add(new StringEnumConverter());
-                    options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
-                })
-                .SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.IgnoreNullValues = true;
+                options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+                options.JsonSerializerOptions.Converters
+                    .Add(new JsonStringEnumConverter());
+                options.JsonSerializerOptions.Converters
+                    .Add(new VersionJsonConverter());
+            })
+            .SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
 
         /// <summary>
         /// Add Azure service to the Service Collection and configure it
@@ -68,20 +73,21 @@ namespace Microsoft.Extensions.DependencyInjection
         /// Add AutoMapper service to the Service Collection and configure it assemblies
         /// </summary>
         /// <param name="services"></param>
-        /// <param name="assemblyNamesToScan"></param>
+        /// <param name="assemblyProfilesToScan"></param>
         /// <returns></returns>
-        public static IServiceCollection AddAutoMapper(this IServiceCollection services, IEnumerable<string> assemblyNamesToScan)
+        public static IServiceCollection AddAutoMapper(this IServiceCollection services, IEnumerable<Assembly> assemblyProfilesToScan)
         {
-            services.TryAddSingleton(GenerateMapperConfiguration(assemblyNamesToScan));
+            services.TryAddSingleton(GenerateMapperConfiguration(assemblyProfilesToScan));
             return services;
         }
 
-        private static IMapper GenerateMapperConfiguration(IEnumerable<string> assemblyNamesToScan)
+        private static IMapper GenerateMapperConfiguration(IEnumerable<Assembly> assemblyProfilesToScan)
         {
             var config = new MapperConfiguration(cfg =>
             {
-                cfg.AddProfiles(assemblyNamesToScan);
+                cfg.AddMaps(assemblyProfilesToScan);
             });
+
             return config.CreateMapper();
         }
 
@@ -94,7 +100,7 @@ namespace Microsoft.Extensions.DependencyInjection
         }
 
         private static void AddSecurityDefinition(SwaggerGenOptions options) =>
-            options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme()
+            options.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme()
             {
                 Name = "Authorization",
                 In = ParameterLocation.Header,
